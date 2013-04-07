@@ -1,17 +1,10 @@
 #!/usr/bin/python
 
-__author__ = 'james'
-
-
-import os, sys
+import os,sys
 import datetime
 
-__author__ = 'james'
-
-#from config import *
+from config import *
 import urllib2
-import os
-import sys
 import logging
 import time
 
@@ -27,41 +20,31 @@ if cmd_folder not in sys.path:
 import bottle
 from bottle import route, run, static_file, request
 
+beatCache={}
+beatTimeCache={}
 
 def application(environ, start_response):
     return bottle.default_app().wsgi(environ,start_response)
 
 dateFormat='%H:%M:%S %Y-%m-%d'
-token="TipKr7CKbaEaa7XRFmU6K9j62"
-useDate='2013-02-21T00:00:00'
-zoneBeat='B2';
-baseUrl = "http://data.seattle.gov/resource/3k2p-39jp.json?$where=event_clearance_date%%3E%%27%s%%27&zone_beat=%s&$order=event_clearance_date%%20desc&$limit=1000"
-
-logger=logging.getLogger("seacri")
+logger=logging.getLogger(logname)
 
 def initLogger():
     logger.setLevel(logging.DEBUG)
-
     # create file handler which logs even debug messages
-    fh = logging.FileHandler('seacri.log')
+    fh = logging.FileHandler('%s.log' % logname)
     fh.setLevel(logging.DEBUG)
-
     # create console handler with a higher log level
     ch = logging.StreamHandler()
     ch.setLevel(logging.ERROR)
-
     # create formatter and add it to the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
-
     # add the handlers to the logger
     logger.addHandler(fh)
     logger.addHandler(ch)
-
     return logger
-
-
 initLogger()
 
 
@@ -97,9 +80,7 @@ def process(jsonDataAsString):
     for l in json.loads(jsonDataAsString):
         del(l['incident_location']['needs_recoding'])
         l['incident_location'] = [float(l['incident_location']['latitude']) , float(l['incident_location']['longitude']) ]
-
         (dt, ttime)=l[sEvtDate].split('T')
-
         retArray.append({
             'date':'%s %s' % (ttime, dt),
             'block':l[sBlockLoc],
@@ -110,22 +91,21 @@ def process(jsonDataAsString):
     print retArray
     return {'dataRows':retArray}
 
-
+# static routing
 @route('/')
 def server_static():
     logger.info("page hit|/")
     return static_file('index.html', root='public/')
-
 
 @route('/<filename>')
 def server_static(filename):
     logger.info("page hit|%s" % filename)
     return static_file(filename, root='public/')
 
-beatCache={}
-beatTimeCache={}
-CACHE_TIMEOUT_SECONDS=.5*60
 
+"""
+threw this in for testing
+"""
 @route('/hello')
 def getHeader():
     for k in request.headers.keys():
@@ -137,22 +117,20 @@ def hello(beat="B2"):
     logger.info("page hit|/crime/%s" % beat)
     curTime=time.time()
 
-
     if beatTimeCache.has_key(beat):
         logger.debug("found key %s" % beat)
         if curTime - beatTimeCache.get(beat) < CACHE_TIMEOUT_SECONDS:
             logger.debug("fell through -- returning cached value")
             return beatCache[beat]
-    else:
-        logger.debug("using cached value")
-        # refresh the data
-        criData=getUrl( datetime.date.today() + datetime.timedelta(days=-1), beat)
-        # now update the caches
-        beatTimeCache[beat]=curTime
-        criData['lastUpdated'] = datetime.datetime.now().strftime(dateFormat)
-        criData['updateIntervalMinutes'] = CACHE_TIMEOUT_SECONDS/60
-        beatCache[beat]=criData
-        return criData
+
+    # refresh or create the data
+    criData=getUrl( datetime.date.today() + datetime.timedelta(days=-1), beat)
+    # now update the caches
+    beatTimeCache[beat]=curTime
+    criData['lastUpdated'] = datetime.datetime.now().strftime(dateFormat)
+    criData['updateIntervalMinutes'] = CACHE_TIMEOUT_SECONDS/60
+    beatCache[beat]=criData
+    return criData
 
 if __name__ == "__main__":
     bottle.debug(True)
