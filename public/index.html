@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="initial-scale=0.7">
+    <title></title>
+    <style>
+        tr:nth-child(odd)    { background-color:#eee; }
+        tr:nth-child(even)    { background-color:#fff; }
+        html, body, #map_canvas {
+            margin: 0;
+            padding: 0;
+            width: 450px;
+            height: 350px;
+        }
+    </style>
+    <script src="jquery.js"></script>
+    <script src="knockout.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+    <script>
+        var map;
+        function initialize() {
+            var mapOptions = {
+                zoom: 13,
+                center: new google.maps.LatLng(47.677178, -122.377353),
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+            map = new google.maps.Map(document.getElementById('map_canvas'),
+                    mapOptions);
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+</head>
+<body>
+
+<h2>Recent 911 Activity</h2>
+<div id="map_canvas"></div>
+<div id="dataform">
+
+<form data-bind="submit: changeBeat">
+    <button type="submit">Refresh</button>
+</form>
+
+<table>
+    <thead><tr>
+        <th>Date</th><th>Hundred Block Location</th><th>Description</th><th></th>
+    </tr></thead>
+    <!-- Todo: Generate table body -->
+    <tbody data-bind="foreach: datarow">
+    <tr>
+        <td data-bind="text: date"></td>
+        <td data-bind="text: block"></td>
+        <td data-bind="text: desc"></td>
+    </tr>
+    </tbody>
+</table>
+</div>
+<script>
+    (function () {
+    var zoneBeat='B2';
+    var data=null;
+    var baseUrl="/crime/";
+    var markers = new Array();
+
+    function IncidentRow(date, block, description) {
+        var self = this;
+        self.date =  ko.observable(date);
+        self.block = ko.observable(block);
+        self.desc = ko.observable(description);
+    }
+
+    function IncidentViewModel() {
+        var self = this;
+        self.datarow = ko.observableArray([]);
+        //self.zoneBeat = ko.observable();
+        self.zoneBeat="B2";
+
+        self.changeBeat = function() {
+            // Operations
+            /*
+            zoneBeat = this.zoneBeat() || "";
+            console.log("current zoneBeat" + zoneBeat);
+
+            if(zoneBeat == "") {console.log("invalid zone beat setting"); zoneBeat='B2';}
+            */
+            self.reload();
+        }
+
+        self.reload = function() {
+            var useUrl = baseUrl + zoneBeat;
+            var openInfoWindow=null;
+
+            $.ajax({
+                dataType: "json",
+                url: useUrl,
+                success: function(allData) {
+                    //clear existing markers
+                    for (x=0;x<markers.length;x++) {
+                        markers[x].setMap(null);
+                    }
+
+                    var mappedTasks = $.map(allData.dataRows, function(rrow) {
+                        var marker = new google.maps.Marker({
+                            map:map,
+                            draggable:false,
+                            position: new google.maps.LatLng(rrow.geoloc[0], rrow.geoloc[1])
+                        });
+                        var html_text=
+                                rrow.date + "<br/>" +
+                                rrow.desc + "<br/>" +
+                                rrow.block + "<br/>" ;
+                        marker.infowindow = new google.maps.InfoWindow({ content: html_text });
+
+                        google.maps.event.addListener(marker, 'mouseover', function() {
+                            if(openInfoWindow) {
+                                openInfoWindow.close();
+                            }
+                            openInfoWindow=marker.infowindow;
+                            marker.infowindow.open(map,marker);
+                        });
+                        markers.push(marker);
+                        return new IncidentRow(rrow.date, rrow.block, rrow.desc)
+                    });
+                    self.datarow(mappedTasks);
+                }
+            });
+        }
+
+        self.reload();
+    }
+    ko.applyBindings(new IncidentViewModel());
+    })();
+</script>
+</body>
+</html>
