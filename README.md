@@ -11,7 +11,7 @@ Access processed json at url: http://seattle.gnslngr.us/crime/<seattle police be
 
 For example, for Ballard, you would use http://seattle.gnslngr.us/crime/B2
 
-Find your precient here: 
+Find your precinct here: 
     http://www.seattle.gov/police/maps/precinct_map.htm
 and from THERE get the beat (precincts are broken down into beats)
 
